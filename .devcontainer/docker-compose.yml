@@ -1,0 +1,24 @@
+# Se combina con ../docker-compose.yml: agrega el contenedor "dev" en la misma red que postgres y floci.
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspaces/the-social-network:cached
+    command: sleep infinity
+    environment:
+      # Dentro de la red de Docker los servicios se llaman por nombre, no por localhost
+      DATABASE_URL: postgres://tsn:tsn@postgres:5432/tsn
+      AWS_ENDPOINT_URL: http://floci:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+      S3_BUCKET: creator-content
+      RECO_URL: http://localhost:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      floci:
+        condition: service_started

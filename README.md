@@ -20,11 +20,16 @@ flowchart LR
 ## Requisitos
 
 - Docker Desktop
-- Rust (rustup) y Node.js 22
-- Terraform + tflocal, AWS CLI + awslocal (dia 6)
+- VS Code con la extension **Dev Containers** (recomendado: trae Rust, Node 22, Terraform, AWS CLI, tflocal y awslocal)
+- Sin devcontainer: instalar Rust (rustup), Node.js 22, Terraform + tflocal y AWS CLI + awslocal a mano
 - k6 (dia 8)
 
 ## Arranque
+
+**Opcion A, devcontainer (recomendada):** abrir la carpeta en VS Code y elegir *Reopen in Container*.
+Levanta `dev`, `postgres` y `floci`; dentro del contenedor las variables de entorno ya apuntan a `postgres` y `floci`.
+
+**Opcion B, solo servicios:**
 
 ```bash
 cp .env.example .env          # en PowerShell: Copy-Item .env.example .env
@@ -43,14 +48,23 @@ docker exec -it tsn-postgres psql -U tsn -d tsn -c "select count(*) from content
 
 ## Estructura
 
-| Carpeta | Contenido |
+Respeta la estructura del proyecto original; `db/` y `docs/` son adiciones.
+
+| Ruta | Contenido |
 | --- | --- |
-| `db/` | Esquema y seed (se ejecutan al crear el contenedor) |
-| `reco-rust/` | Servicio de recomendaciones (dias 2 a 4) |
-| `api-node/` | API REST (dias 5 y 6) |
-| `infra/` | Terraform del bucket S3 (dia 6) |
-| `loadtest/` | Pruebas de carga con k6 (dia 8) |
-| `docs/original/` | Requerimientos y esqueleto original del proyecto |
+| `.devcontainer/` | Entorno de desarrollo (Rust, Node 22, Terraform, AWS CLI) |
+| `docker-compose.yml` | PostgreSQL 17 + pgvector y emulador S3 (Floci) |
+| `db/` | Esquema y seed (se ejecutan al crear el contenedor de Postgres) |
+| `src/` | Raiz del crate de Rust (`Cargo.toml` se crea el dia 2) |
+| `src/src/` | Motor de recomendaciones (`recommendation_engine.rs`) |
+| `src/lambda/` | Punto de entrada Lambda en Rust |
+| `src/api/` | API en Node.js (Express) |
+| `src/infra/` | Terraform (`main.tf`) |
+| `loadtest/` | Pruebas de carga con k6 |
+| `docs/` | Requerimientos originales |
+
+Los archivos de `src/` y `loadtest/` son el esqueleto original y todavia no compilan; se corrigen segun el plan
+(motor y Lambda: dias 2 a 4, API: dia 5, Terraform: dia 6, k6: dia 8).
 
 ## Resultados
 

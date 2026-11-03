@@ -1,0 +1,24 @@
+{
+  "name": "the-social-network (Rust & Node.js)",
+  "dockerComposeFile": ["../docker-compose.yml", "docker-compose.yml"],
+  "service": "dev",
+  "runServices": ["dev", "postgres", "floci"],
+  "workspaceFolder": "/workspaces/the-social-network",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/terraform:1": {},
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/python:1": {}
+  },
+  "forwardPorts": [3000, 8080],
+  "postCreateCommand": "pipx install terraform-local && pipx install awscli-local && rustc --version && node --version && terraform -version",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "dbaeumer.vscode-eslint",
+        "hashicorp.terraform"
+      ]
+    }
+  }
+}
