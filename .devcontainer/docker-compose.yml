@@ -1,11 +1,13 @@
 # Se combina con ../docker-compose.yml: agrega el contenedor "dev" en la misma red que postgres y floci.
+# OJO: al combinarse, las rutas relativas se resuelven desde la RAIZ del repo (carpeta del primer archivo),
+# no desde .devcontainer/. Por eso context es .devcontainer y el volumen es ".".
 services:
   dev:
     build:
-      context: .
+      context: .devcontainer
       dockerfile: Dockerfile
     volumes:
-      - ..:/workspaces/the-social-network:cached
+      - .:/workspaces/the-social-network:cached
     command: sleep infinity
     environment:
       # Dentro de la red de Docker los servicios se llaman por nombre, no por localhost
