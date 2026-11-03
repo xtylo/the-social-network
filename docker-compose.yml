@@ -19,23 +19,13 @@ services:
       timeout: 3s
       retries: 20
 
-  # Emulador de S3. Desde marzo de 2026 la imagen de LocalStack exige LOCALSTACK_AUTH_TOKEN
-  # (cuenta Hobby gratuita, uso no comercial: https://app.localstack.cloud).
-  # Sin cuenta: comenta este servicio y descomenta "floci" de abajo.
-  localstack:
-    image: localstack/localstack
-    container_name: tsn-localstack
-    environment:
-      - SERVICES=s3
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-}
+  # Emulador de S3 sin cuenta ni token (MIT): https://github.com/hectorvent/floci
+  # Alternativa: LocalStack (exige LOCALSTACK_AUTH_TOKEN desde marzo de 2026), mismo puerto 4566.
+  floci:
+    image: hectorvent/floci:latest
+    container_name: tsn-floci
     ports:
       - "4566:4566"
-
-  # floci:
-  #   image: hectorvent/floci:latest
-  #   container_name: tsn-floci
-  #   ports:
-  #     - "4566:4566"
 
 volumes:
   pgdata:

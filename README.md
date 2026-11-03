@@ -13,7 +13,7 @@ flowchart LR
   API -->|GET /recommendations| R[reco-rust :8080]
   R --> PG[(PostgreSQL + pgvector :5432)]
   API --> PG
-  API -->|URL prefirmada| S3[(S3 emulado :4566)]
+  API -->|URL prefirmada| S3[(S3 emulado - Floci :4566)]
   C -->|PUT directo| S3
 ```
 
@@ -29,7 +29,7 @@ flowchart LR
 ```bash
 cp .env.example .env          # en PowerShell: Copy-Item .env.example .env
 docker compose up -d
-docker compose ps             # postgres debe aparecer "healthy"
+docker compose ps             # postgres "healthy" y floci arriba
 ```
 
 La primera vez, Postgres crea el esquema y carga datos sinteticos (`db/`), unos 10 a 30 segundos.
