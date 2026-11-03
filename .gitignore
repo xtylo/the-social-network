@@ -1,0 +1,26 @@
+# Entorno
+.env
+
+# Rust
+target/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Resultados de k6
+loadtest/results/
+
+# IDE / SO
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

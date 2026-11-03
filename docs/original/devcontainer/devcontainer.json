@@ -1,0 +1,12 @@
+{
+  "name": "Rust & Node.js Dev Container",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "settings": {},
+  "extensions": [
+    "rust-lang.rust",
+    "dbaeumer.vscode-eslint"
+  ],
+  "postCreateCommand": "cargo install --path ."
+}

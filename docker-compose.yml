@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: tsn-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tsn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tsn}
+      POSTGRES_DB: ${POSTGRES_DB:-tsn}
+    # memoria extra para construir el indice HNSW (dia 7) sin que se vuelva lento
+    command: ["postgres", "-c", "maintenance_work_mem=256MB"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro   # 01_schema.sql y 02_seed.sql corren solo con el volumen vacio
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tsn} -d ${POSTGRES_DB:-tsn}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Emulador de S3. Desde marzo de 2026 la imagen de LocalStack exige LOCALSTACK_AUTH_TOKEN
+  # (cuenta Hobby gratuita, uso no comercial: https://app.localstack.cloud).
+  # Sin cuenta: comenta este servicio y descomenta "floci" de abajo.
+  localstack:
+    image: localstack/localstack
+    container_name: tsn-localstack
+    environment:
+      - SERVICES=s3
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-}
+    ports:
+      - "4566:4566"
+
+  # floci:
+  #   image: hectorvent/floci:latest
+  #   container_name: tsn-floci
+  #   ports:
+  #     - "4566:4566"
+
+volumes:
+  pgdata:
