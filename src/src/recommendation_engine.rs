@@ -1,4 +1,4 @@
-// Implementa la lógica de recomendación de contenido utilizando características vectoriales.
+// Implements the content recommendation logic using feature vectors.
 
 use pgvector::Vector;
 

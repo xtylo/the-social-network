@@ -1,4 +1,4 @@
-// Define la infraestructura de AWS utilizando Terraform para desplegar los servicios necesarios.
+// Defines the AWS infrastructure with Terraform to deploy the required services.
 
 provider "aws" {
   region = "us-east-1"

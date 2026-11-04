@@ -1,6 +1,6 @@
-# Se combina con ../docker-compose.yml: agrega el contenedor "dev" en la misma red que postgres y floci.
-# OJO: al combinarse, las rutas relativas se resuelven desde la RAIZ del repo (carpeta del primer archivo),
-# no desde .devcontainer/. Por eso context es .devcontainer y el volumen es ".".
+# Merged with ../docker-compose.yml: adds the "dev" container on the same network as postgres and floci.
+# NOTE: when merged, relative paths resolve from the repo ROOT (the first file's folder),
+# not from .devcontainer/. That is why context is .devcontainer and the volume is ".".
 services:
   dev:
     build:
@@ -10,7 +10,7 @@ services:
       - .:/workspaces/the-social-network:cached
     command: sleep infinity
     environment:
-      # Dentro de la red de Docker los servicios se llaman por nombre, no por localhost
+      # Inside the Docker network, services are reached by name, not localhost
       DATABASE_URL: postgres://tsn:tsn@postgres:5432/tsn
       AWS_ENDPOINT_URL: http://floci:4566
       AWS_ACCESS_KEY_ID: test

@@ -1,4 +1,4 @@
-// Código de la función Lambda que genera recomendaciones de contenido.
+// Lambda function code that generates content recommendations.
 
 use lambda_runtime::{handler_fn, Context, Error};
 use serde_json::Value;

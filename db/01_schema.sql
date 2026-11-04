@@ -1,5 +1,5 @@
--- Esquema base. Se ejecuta automaticamente la primera vez que arranca el contenedor de Postgres
--- (todo lo que esta en /docker-entrypoint-initdb.d corre en orden alfabetico).
+-- Base schema. Runs automatically the first time the Postgres container starts
+-- (everything in /docker-entrypoint-initdb.d runs in alphabetical order).
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -28,15 +28,15 @@ CREATE TABLE interactions (
   content_id int         NOT NULL REFERENCES content(id),
   type       text        NOT NULL CHECK (type IN ('view', 'like', 'share')),
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, content_id, type)  -- idempotencia: un like repetido no se duplica
+  PRIMARY KEY (user_id, content_id, type)  -- idempotency: a repeated like is not duplicated
 );
 
 CREATE INDEX interactions_content_idx ON interactions (content_id);
 
--- El indice HNSW se crea a proposito el DIA 7, para medir la consulta antes y despues.
+-- The HNSW index is created on purpose on DAY 7, to measure the query before and after.
 -- CREATE INDEX content_embedding_hnsw ON content USING hnsw (embedding vector_cosine_ops);
 --
--- OJO (comprobado con los datos del seed): con el indice HNSW, LIMIT 50 devuelve solo ~40 filas,
--- porque hnsw.ef_search vale 40 por defecto y el filtro "ya visto" descarta candidatos.
--- Solucion para cualquier version de pgvector:   SET hnsw.ef_search = 100;
--- Con pgvector >= 0.8 (la imagen de Docker):      SET hnsw.iterative_scan = relaxed_order;
+-- NOTE (verified with the seed data): with the HNSW index, LIMIT 50 returns only ~40 rows,
+-- because hnsw.ef_search defaults to 40 and the "already seen" filter drops candidates.
+-- Fix for any pgvector version:               SET hnsw.ef_search = 100;
+-- With pgvector >= 0.8 (the Docker image):    SET hnsw.iterative_scan = relaxed_order;

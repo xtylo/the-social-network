@@ -1,4 +1,4 @@
-# Entorno
+# Environment
 .env
 
 # Rust
@@ -14,10 +14,10 @@ npm-debug.log*
 *.tfstate.*
 .terraform.lock.hcl
 
-# Resultados de k6
+# k6 results
 loadtest/results/
 
-# IDE / SO
+# IDE / OS
 .vs/
 .vscode/*
 !.vscode/extensions.json

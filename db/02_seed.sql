@@ -1,6 +1,6 @@
--- Datos sinteticos: 1,000 creadores, 10,000 usuarios, 100,000 contenidos, 20 likes por usuario.
--- Cada contenido tiene una categoria (0..15) y su vector es 1.0 en esa dimension + ruido.
--- Cada usuario prefiere la categoria (id % 16), lo que permite medir la calidad de las recomendaciones.
+-- Synthetic data: 1,000 creators, 10,000 users, 100,000 content items, 20 likes per user.
+-- Each content item has a category (0..15) and its vector is 1.0 in that dimension + noise.
+-- Each user prefers category (id % 16), which makes it possible to measure recommendation quality.
 
 INSERT INTO creators (name) SELECT 'creator_' || g FROM generate_series(1, 1000) g;
 INSERT INTO users    (name) SELECT 'user_'    || g FROM generate_series(1, 10000) g;

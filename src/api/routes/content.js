@@ -1,4 +1,4 @@
-// Define las rutas del API para la gestión de contenido y recomendaciones.
+// Defines the API routes for content management and recommendations.
 
 const express = require('express');
 const router = express.Router();

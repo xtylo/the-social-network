@@ -6,21 +6,21 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-tsn}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tsn}
       POSTGRES_DB: ${POSTGRES_DB:-tsn}
-    # memoria extra para construir el indice HNSW (dia 7) sin que se vuelva lento
+    # extra memory so building the HNSW index (day 7) does not slow down
     command: ["postgres", "-c", "maintenance_work_mem=256MB"]
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d:ro   # 01_schema.sql y 02_seed.sql corren solo con el volumen vacio
+      - ./db:/docker-entrypoint-initdb.d:ro   # 01_schema.sql and 02_seed.sql only run when the volume is empty
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tsn} -d ${POSTGRES_DB:-tsn}"]
       interval: 5s
       timeout: 3s
       retries: 20
 
-  # Emulador de S3 sin cuenta ni token (MIT): https://github.com/hectorvent/floci
-  # Alternativa: LocalStack (exige LOCALSTACK_AUTH_TOKEN desde marzo de 2026), mismo puerto 4566.
+  # S3 emulator, no account or token required (MIT): https://github.com/hectorvent/floci
+  # Alternative: LocalStack (requires LOCALSTACK_AUTH_TOKEN since March 2026), same port 4566.
   floci:
     image: hectorvent/floci:latest
     container_name: tsn-floci
