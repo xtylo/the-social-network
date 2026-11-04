@@ -1,5 +1,6 @@
 mod error;
 mod models;
+mod recommendation_engine;
 mod repository;
 
 use std::time::Duration;
@@ -19,6 +20,8 @@ use crate::models::RecommendationsResponse;
 /// How many candidates we ask pgvector for, and how many we return.
 const CANDIDATES: i64 = 50;
 const RESULTS: usize = 10;
+/// Diversity rule: at most this many items from the same creator in one response.
+const MAX_PER_CREATOR: usize = 2;
 
 /// Shared state for every request (like a singleton registered in ASP.NET Core DI).
 /// `Clone` is cheap: PgPool is internally an Arc, so clones share the same pool.
@@ -83,10 +86,10 @@ async fn recommendations(
 ) -> Result<Json<RecommendationsResponse>, AppError> {
     let (strategy, items) = match repository::user_profile(&state.db, user_id).await? {
         Some(profile) => {
-            let mut candidates =
+            let candidates =
                 repository::nearest_unseen(&state.db, user_id, &profile, CANDIDATES).await?;
-            candidates.truncate(RESULTS); // day 4: replace with rerank (max 2 per creator)
-            ("personalized", candidates)
+            let items = recommendation_engine::rerank(candidates, MAX_PER_CREATOR, RESULTS);
+            ("personalized", items)
         }
         None => (
             "trending",
