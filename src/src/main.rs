@@ -1,8 +1,24 @@
+mod error;
+mod models;
+mod repository;
+
 use std::time::Duration;
 
-use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
+use axum::{
+    Json, Router,
+    extract::{Path, State},
+    http::StatusCode,
+    routing::get,
+};
 use serde::Serialize;
 use sqlx::postgres::{PgPool, PgPoolOptions};
+
+use crate::error::AppError;
+use crate::models::RecommendationsResponse;
+
+/// How many candidates we ask pgvector for, and how many we return.
+const CANDIDATES: i64 = 50;
+const RESULTS: usize = 10;
 
 /// Shared state for every request (like a singleton registered in ASP.NET Core DI).
 /// `Clone` is cheap: PgPool is internally an Arc, so clones share the same pool.
@@ -34,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/recommendations/{user_id}", get(recommendations))
         .with_state(AppState { db });
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
@@ -56,5 +73,30 @@ async fn health(State(state): State<AppState>) -> Result<Json<HealthResponse>, S
     Ok(Json(HealthResponse {
         status: "ok",
         pgvector: version,
+    }))
+}
+
+/// GET /recommendations/{user_id}
+async fn recommendations(
+    State(state): State<AppState>,
+    Path(user_id): Path<i32>,
+) -> Result<Json<RecommendationsResponse>, AppError> {
+    let (strategy, items) = match repository::user_profile(&state.db, user_id).await? {
+        Some(profile) => {
+            let mut candidates =
+                repository::nearest_unseen(&state.db, user_id, &profile, CANDIDATES).await?;
+            candidates.truncate(RESULTS); // day 4: replace with rerank (max 2 per creator)
+            ("personalized", candidates)
+        }
+        None => (
+            "trending",
+            repository::trending(&state.db, RESULTS as i64).await?,
+        ),
+    };
+
+    Ok(Json(RecommendationsResponse {
+        user_id,
+        strategy,
+        items,
     }))
 }
