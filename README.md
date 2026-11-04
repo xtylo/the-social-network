@@ -1,71 +1,71 @@
-# The Social Network: red social para creadores de contenido
+# The Social Network: a social network for content creators
 
-Plataforma que recomienda contenido de creadores usando similitud de vectores.
-Motor de recomendaciones en **Rust** sobre **PostgreSQL + pgvector**, API en **Node.js** y archivos multimedia en **S3**.
+A platform that recommends creators' content using vector similarity.
+Recommendation engine in **Rust** on top of **PostgreSQL + pgvector**, API in **Node.js**, and media files in **S3**.
 
-> En construccion: MVP local de 8 sesiones. El plan esta en el documento "Plan de 8 dias".
+> Work in progress: an 8-session local MVP. See the "8-day plan" document.
 
-## Arquitectura
+## Architecture
 
 ```mermaid
 flowchart LR
-  C[Cliente / k6] --> API[api-node :3000]
-  API -->|GET /recommendations| R[reco-rust :8080]
+  C[Client / k6] --> API[Node API :3000]
+  API -->|GET /recommendations| R[Rust reco service :8080]
   R --> PG[(PostgreSQL + pgvector :5432)]
   API --> PG
-  API -->|URL prefirmada| S3[(S3 emulado - Floci :4566)]
-  C -->|PUT directo| S3
+  API -->|presigned URL| S3[(Emulated S3 - Floci :4566)]
+  C -->|direct PUT| S3
 ```
 
-## Requisitos
+## Requirements
 
 - Docker Desktop
-- VS Code con la extension **Dev Containers** (recomendado: trae Rust, Node 22, Terraform, AWS CLI, tflocal y awslocal)
-- Sin devcontainer: instalar Rust (rustup), Node.js 22, Terraform + tflocal y AWS CLI + awslocal a mano
-- k6 (dia 8)
+- VS Code with the **Dev Containers** extension (recommended: ships Rust, Node 22, Terraform and the AWS CLI)
+- Without the dev container: install Rust (rustup), Node.js 22, Terraform and the AWS CLI manually
+- k6 (day 8)
 
-## Arranque
+## Getting started
 
-**Opcion A, devcontainer (recomendada):** abrir la carpeta en VS Code y elegir *Reopen in Container*.
-Levanta `dev`, `postgres` y `floci`; dentro del contenedor las variables de entorno ya apuntan a `postgres` y `floci`.
+**Option A, dev container (recommended):** open the folder in VS Code and choose *Reopen in Container*.
+It starts `dev`, `postgres` and `floci`; inside the container the environment variables already point to `postgres` and `floci`.
 
-**Opcion B, solo servicios:**
+**Option B, services only:**
 
 ```bash
-cp .env.example .env          # en PowerShell: Copy-Item .env.example .env
+cp .env.example .env          # PowerShell: Copy-Item .env.example .env
 docker compose up -d
-docker compose ps             # postgres "healthy" y floci arriba
+docker compose ps             # postgres "healthy" and floci running
 ```
 
-La primera vez, Postgres crea el esquema y carga datos sinteticos (`db/`), unos 10 a 30 segundos.
-Para empezar de cero: `docker compose down -v && docker compose up -d`.
+On first start, Postgres creates the schema and loads synthetic data (`db/`), which takes 10 to 30 seconds.
+To start from scratch: `docker compose down -v && docker compose up -d`.
 
-Comprobar los datos:
+Check the data:
 
 ```bash
 docker exec -it tsn-postgres psql -U tsn -d tsn -c "select count(*) from content;"
 ```
 
-## Estructura
+## Project structure
 
-Respeta la estructura del proyecto original; `db/` y `docs/` son adiciones.
+Follows the original project structure; `db/` and `docs/` are additions.
 
-| Ruta | Contenido |
+| Path | Contents |
 | --- | --- |
-| `.devcontainer/` | Entorno de desarrollo (Rust, Node 22, Terraform, AWS CLI) |
-| `docker-compose.yml` | PostgreSQL 17 + pgvector y emulador S3 (Floci) |
-| `db/` | Esquema y seed (se ejecutan al crear el contenedor de Postgres) |
-| `src/` | Raiz del crate de Rust (`Cargo.toml` se crea el dia 2) |
-| `src/src/` | Motor de recomendaciones (`recommendation_engine.rs`) |
-| `src/lambda/` | Punto de entrada Lambda en Rust |
-| `src/api/` | API en Node.js (Express) |
+| `.devcontainer/` | Development environment (Rust, Node 22, Terraform, AWS CLI) |
+| `docker-compose.yml` | PostgreSQL 17 + pgvector and S3 emulator (Floci) |
+| `db/` | Schema and seed (run when the Postgres container is first created) |
+| `src/` | Rust crate root (`Cargo.toml` is created on day 2) |
+| `src/src/` | Recommendation engine (`recommendation_engine.rs`) |
+| `src/lambda/` | Rust Lambda entry point |
+| `src/api/` | Node.js API (Express) |
 | `src/infra/` | Terraform (`main.tf`) |
-| `loadtest/` | Pruebas de carga con k6 |
-| `docs/` | Requerimientos originales |
+| `loadtest/` | k6 load tests |
+| `docs/` | Original requirements |
 
-Los archivos de `src/` y `loadtest/` son el esqueleto original y todavia no compilan; se corrigen segun el plan
-(motor y Lambda: dias 2 a 4, API: dia 5, Terraform: dia 6, k6: dia 8).
+The files in `src/` and `loadtest/` are the original skeleton and do not compile yet; they are fixed following the plan
+(engine and Lambda: days 2 to 4, API: day 5, Terraform: day 6, k6: day 8).
 
-## Resultados
+## Results
 
-Pendiente (dias 7 y 8): latencia con y sin indice HNSW, calidad de las recomendaciones frente al azar y resultados de k6.
+Pending (days 7 and 8): latency with and without the HNSW index, recommendation quality versus random, and k6 results.
