@@ -82,11 +82,11 @@ Recommendation logic (Rust):
 
 ## Day 5: Node API (60 min)
 
-- [ ] (10 min) `cd src/api && npm init -y`; install `express`, `pg`, `zod`, `pino`.
-- [ ] (15 min) `POST /interactions` `{ userId, contentId, type }` with `INSERT ... ON CONFLICT DO NOTHING`.
-- [ ] (10 min) `GET /content/:id`.
-- [ ] (15 min) `GET /recommendations/:userId` forwards to `RECO_URL` (Rust) with `fetch` and returns 502 if it fails. Rewrite the original `routes/content.js`, which requires a controller that does not exist.
-- [ ] (10 min) `requests.http` file to try every endpoint from VS Code.
+- [x] (10 min) `cd src/api && npm init -y`; install `express`, `pg`, `zod`, `pino`.
+- [x] (15 min) `POST /interactions` `{ userId, contentId, type }` with `INSERT ... ON CONFLICT DO NOTHING`.
+- [x] (10 min) `GET /content/:id`.
+- [x] (15 min) `GET /recommendations/:userId` forwards to `RECO_URL` (Rust) with `fetch` and returns 502 if it fails. Rewrite the original `routes/content.js`, which requires a controller that does not exist.
+- [x] (10 min) `requests.http` file to try every endpoint from VS Code.
 
 **Done when:** liking 5 items of another category changes that user's recommendations through the Node API.
 
