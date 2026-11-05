@@ -8,6 +8,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-tsn}
     # extra memory so building the HNSW index (day 7) does not slow down
     command: ["postgres", "-c", "maintenance_work_mem=256MB"]
+    # Parallel index builds share memory through /dev/shm, which Docker limits to 64 MB by default.
+    # It must be larger than maintenance_work_mem, or CREATE INDEX fails with "No space left on device".
+    shm_size: 512mb
     ports:
       - "5432:5432"
     volumes:

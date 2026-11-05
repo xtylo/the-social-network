@@ -34,7 +34,7 @@ CREATE TABLE interactions (
 CREATE INDEX interactions_content_idx ON interactions (content_id);
 
 -- The HNSW index is created on purpose on DAY 7, to measure the query before and after.
--- CREATE INDEX content_embedding_hnsw ON content USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX content_embedding_hnsw ON content USING hnsw (embedding vector_cosine_ops);
 --
 -- NOTE (verified with the seed data): with the HNSW index, LIMIT 50 returns only ~40 rows,
 -- because hnsw.ef_search defaults to 40 and the "already seen" filter drops candidates.
