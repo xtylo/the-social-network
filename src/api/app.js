@@ -6,6 +6,7 @@ import { pool } from './db.js';
 import { logger } from './logger.js';
 import contentRoutes from './routes/content.js';
 import interactionRoutes from './routes/interactions.js';
+import uploadRoutes from './routes/uploads.js';
 
 export const app = express();
 
@@ -25,6 +26,7 @@ app.get('/health', async (req, res) => {
 
 app.use(contentRoutes);
 app.use(interactionRoutes);
+app.use(uploadRoutes);
 
 // Unknown routes.
 app.use((req, res) => res.status(404).json({ error: 'not found' }));
