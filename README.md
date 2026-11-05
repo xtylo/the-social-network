@@ -3,7 +3,7 @@
 A platform that recommends creators' content using vector similarity.
 Recommendation engine in **Rust** on top of **PostgreSQL + pgvector**, API in **Node.js**, and media files in **S3**.
 
-> Work in progress: an 8-session local MVP. See the "8-day plan" document.
+> Work in progress: an 8-session local MVP. See the [8-day plan](docs/PLAN.md) for scope, progress and next steps.
 
 ## Architecture
 
@@ -61,10 +61,10 @@ Follows the original project structure; `db/` and `docs/` are additions.
 | `src/api/` | Node.js API (Express) |
 | `src/infra/` | Terraform (`main.tf`) |
 | `loadtest/` | k6 load tests |
-| `docs/` | Original requirements |
+| `docs/` | [8-day plan](docs/PLAN.md) and [original requirements](docs/original-requirements.md) |
 
-The files in `src/` and `loadtest/` are the original skeleton and do not compile yet; they are fixed following the plan
-(engine and Lambda: days 2 to 4, API: day 5, Terraform: day 6, k6: day 8).
+The Rust service in `src/src/` works (days 2 to 4). `src/api`, `src/infra`, `src/lambda` and `loadtest/` still hold the
+original skeleton and are fixed following the [plan](docs/PLAN.md) (API: day 5, Terraform: day 6, k6: day 8; Lambda: phase 2).
 
 ## Results
 
