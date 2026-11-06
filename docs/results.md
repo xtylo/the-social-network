@@ -80,6 +80,51 @@ Targets from the original requirements: p95 < 150 ms, p99 < 200 ms, errors < 0.1
 These numbers compare load levels on this machine; they are not a production capacity estimate. The original target
 of 2,000 req/s belongs to the AWS deployment (phase 2).
 
+## AWS deployment (phase 2)
+
+Same code on AWS (`us-east-1`): API Gateway HTTP API -> Rust Lambda (arm64, 256 MB, `DB_MAX_CONNECTIONS=2`) ->
+RDS PostgreSQL 17 + pgvector 0.8.1 on `db.t4g.micro` (2 vCPU, 1 GB), no RDS Proxy. k6 ran from a laptop in Sonora,
+Mexico, so every request includes the round trip to Virginia. Lambda and RDS numbers come from CloudWatch
+(`scripts/aws-metrics.sh`). Measured on November 6, 2026.
+
+### Single requests
+
+| What | Result |
+| --- | --- |
+| Nearest-neighbor query on RDS (`db/explain.sql`) | 4.7 ms (3.9 ms on the laptop) |
+| Node Lambda cold start (`/health`, one `curl`) | 2.08 s |
+| Rust Lambda cold start (`/recommendations/42`) | 0.93 s |
+| Rust Lambda warm, end to end from Mexico | 0.29 s (the Lambda itself: 18.7 ms) |
+| Memory used | Rust Lambda 17 MB, Node Lambda 130 MB |
+
+### Load test (`GET /recommendations/:userId`, 30 s per step, after a 10 req/s warm-up)
+
+| Requested | Achieved | p50 | p95 | p99 | Errors | Lambda avg duration | Max concurrent Lambdas | Max RDS connections | Max RDS CPU |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 25 req/s | 25 req/s | 120 ms | 168 ms | 220 ms | 0% | 14-25 ms | 10 | 18 | 5% |
+| 50 req/s | 50 req/s | 104 ms | 132 ms | 166 ms | 0% | 14 ms | 15 | 18 | 6% |
+| 100 req/s | 99 req/s | 102 ms | 120 ms | 199 ms | 0% | 14 ms | 13 | 25 | 8% |
+| 200 req/s | 149 req/s | 3.12 s | 6.25 s | 6.35 s | 60% | 523 ms -> 2,203 ms | **400 (account limit)** | 34 -> 70 -> 206 | 12% -> 54% |
+| 300 req/s | 261 req/s | 211 ms | 3.17 s | 3.22 s | 50% | 1,332 ms | 400 | 206 | 54% |
+
+**Findings**
+
+- **Healthy up to 100 req/s.** The Rust Lambda runs in about 14 ms; the ~100 ms seen by k6 is almost all network
+  between Mexico and Virginia. 15 concurrent Lambdas and 8% RDS CPU were enough.
+- **Connection storm at 200 req/s.** Scaling out creates new Lambda instances, and each one opens its own TLS
+  connections to PostgreSQL. On a 2 vCPU instance that is slow, so requests pile up, Lambda creates even more
+  instances, which open even more connections. Lambda duration jumped from 14 ms to 2.2 s (p99 ~3.4 s, matching the
+  3 s pool `acquire_timeout`), concurrency hit the account limit of 400, Lambda throttled 582 invocations, 6,214
+  invocations failed, and RDS reached 206 connections.
+- **The database CPU was not the bottleneck** (54% at the worst point); connection management was.
+- **Laptop vs Lambda.** Locally, one long-lived process with a pool of 10 connections handled 400 req/s within
+  targets. On Lambda every instance is a separate process with its own pool, so connections grow with concurrency.
+  This is the problem **RDS Proxy** solves (a shared pool in front of the database), which was left out for cost.
+
+**What would fix it, in order of impact:** RDS Proxy; reserved concurrency on the Rust Lambda (for example 20) so it
+fails fast instead of flooding the database; provisioned concurrency to avoid cold starts at traffic spikes; a larger
+RDS instance.
+
 ## Environment notes
 
 - Docker limits `/dev/shm` to 64 MB. The first parallel HNSW build failed with

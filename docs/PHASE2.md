@@ -11,7 +11,7 @@ and a real **S3** bucket, all created with **Terraform** and destroyed at the en
 | 9 | AWS account guardrails and Lambda-ready code | Done |
 | 10 | Terraform: RDS + pgvector, S3, networking; load the data | Done |
 | 11 | Terraform: Lambdas + API Gateway; end-to-end smoke test | Done |
-| 12 | Load test on AWS, results, `terraform destroy` | Pending |
+| 12 | Load test on AWS, results, `terraform destroy` | Done |
 
 ## Architecture on AWS
 
@@ -69,6 +69,9 @@ API Gateway and S3. Accounts created after July 15, 2025 get Free Tier credits t
 - **RDS seed is slow with the HNSW index already in place:** the index is updated row by row on a 2 vCPU / 1 GB
   instance. For bulk loads, create the index after inserting the data.
 - **Query on RDS:** the nearest-neighbor query ran in 4.7 ms on `db.t4g.micro` (3.9 ms on the laptop).
+- **Load test: healthy up to 100 req/s, connection storm at 200 req/s.** Without RDS Proxy every new Lambda instance
+  opens its own database connections; scale-out drove Lambda concurrency to the account limit (400) and RDS to 206
+  connections while its CPU stayed at 54%. Details in [results.md](results.md#aws-deployment-phase-2).
 
 ## Day 9: Guardrails and Lambda-ready code (60 min)
 
@@ -102,10 +105,10 @@ API Gateway and S3. Accounts created after July 15, 2025 get Free Tier credits t
 
 ## Day 12: Load test, results and teardown (60 min)
 
-- [ ] (25 min) k6 from the laptop with `-e BASE_URL=<api url>` at 25, 50, 100 and 200 req/s (30 s each). Watch CloudWatch: Lambda duration, concurrent executions, throttles; RDS CPU and connections.
-- [ ] (15 min) `docs/results.md`: AWS section (latency including the network from Mexico, cold starts, where it saturates and why).
-- [ ] (10 min) README: AWS architecture and how to deploy.
-- [ ] (10 min) **`terraform destroy`**, then check in the console that RDS, Lambdas, API and bucket are gone, and look at Billing.
+- [x] (25 min) k6 from the laptop with `-e BASE_URL=<api url>` at 25, 50, 100, 200 and 300 req/s (30 s each). Watch CloudWatch: Lambda duration, concurrent executions, throttles; RDS CPU and connections.
+- [x] (15 min) `docs/results.md`: AWS section (latency including the network from Mexico, cold starts, where it saturates and why).
+- [x] (10 min) README: AWS architecture and how to deploy.
+- [x] (10 min) **`terraform destroy`**, then check in the console that RDS, Lambdas, API and bucket are gone, and look at Billing.
 
 **Done when:** results documented, everything destroyed, and the bill is under $5.
 

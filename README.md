@@ -4,8 +4,9 @@ A social network backend that recommends creators' content by **vector similarit
 A **Rust** service finds each user's nearest content with **PostgreSQL + pgvector**, a **Node.js** API handles
 interactions and content, and media files go straight to **S3** through presigned URLs.
 
-Built as a local MVP in 8 one-hour sessions ([plan](docs/PLAN.md)). Everything runs on Docker; S3 is emulated with
-[Floci](https://github.com/hectorvent/floci).
+Built as a local MVP in 8 one-hour sessions ([plan](docs/PLAN.md)), then deployed to AWS in 4 more
+([phase 2](docs/PHASE2.md)): Lambda, API Gateway, RDS PostgreSQL + pgvector and S3, all with Terraform.
+Locally everything runs on Docker, with S3 emulated by [Floci](https://github.com/hectorvent/floci).
 
 ## Results
 
@@ -20,6 +21,12 @@ Measured locally with 100,000 content items and 10,000 users ([details and how t
 | Saturation point | ~800 req/s (p99 281 ms, no errors) |
 | Collapse | 1,000 req/s (throughput falls to 615 req/s, 1.13% errors) |
 | Tests | 4 Rust unit tests, 4 Node integration tests |
+| **AWS:** Rust Lambda warm duration / memory | **14-19 ms / 17 MB** (Node Lambda: 130 MB) |
+| **AWS:** healthy load from a laptop in Mexico | **100 req/s**, p50 102 ms (mostly network), 0 errors |
+| **AWS:** breaking point | 200 req/s: database connection storm (Lambda concurrency hit 400, RDS 206 connections, CPU only 54%) |
+
+On AWS, the limit was not the database CPU but **connections**: every new Lambda instance opens its own, which is
+what RDS Proxy solves (left out for cost). Full analysis in [docs/results.md](docs/results.md#aws-deployment-phase-2).
 
 The quality number comes from synthetic data with perfectly separated categories: it shows the pipeline works end
 to end, not real-world quality. The load test shares one laptop between k6 and all services.
@@ -45,6 +52,23 @@ flowchart LR
 
 **Uploads:** the API signs a 10-minute PUT URL, the client uploads directly to S3, then `POST /content` checks the
 file exists and registers it. Large files never pass through the API.
+
+### On AWS
+
+```mermaid
+flowchart LR
+  C[Client / k6] --> GW[API Gateway HTTP API]
+  GW -->|GET /recommendations/userId| RL[Lambda: Rust, arm64]
+  GW -->|everything else| NL[Lambda: Node.js, arm64]
+  RL --> RDS[(RDS PostgreSQL 17 + pgvector)]
+  NL --> RDS
+  NL -->|S3 gateway endpoint| S3[(S3)]
+  C -->|presigned PUT| S3
+```
+
+The same code runs in both places: Rust uses `lambda_http` with the same axum router, and Node wraps the same Express
+app with `serverless-http`. API Gateway routes recommendations straight to Rust. The Lambdas live in the default VPC
+without a NAT Gateway (a free S3 gateway endpoint gives them S3), and every IAM role only gets what its function needs.
 
 ## API
 
@@ -80,6 +104,22 @@ curl localhost:3000/recommendations/42
 
 Without the dev container, `docker compose up -d` starts only PostgreSQL and Floci (copy `.env.example` to `.env`).
 
+### Deploy to AWS
+
+Requires an AWS account and an access key in the `tsn` profile (`aws configure --profile tsn`). Costs a few cents per
+hour while RDS exists; destroy it when done.
+
+```bash
+cd src && cargo lambda build --release --arm64 --output-format zip && cd ..   # Rust Lambda
+./scripts/package-api.sh                                                    # Node Lambda
+source scripts/aws-env.sh                                                   # this terminal -> real AWS
+export TF_VAR_my_ip_cidr="$(curl -s https://checkip.amazonaws.com)/32"
+cd src/infra/aws && terraform init && terraform apply
+psql "$(terraform output -raw database_url)" -f ../../../db/01_schema.sql   # then 02_seed.sql
+curl "$(terraform output -raw api_url)/recommendations/42"
+terraform destroy                                                           # when finished
+```
+
 ### Tests and measurements
 
 ```bash
@@ -102,6 +142,10 @@ k6 run -e RATE=400 loadtest/k6.js                 # load test at a fixed rate
   and query path are the same ones real embeddings would use.
 - **Floci instead of LocalStack**, which requires an account and auth token since March 2026.
 - **`shm_size: 512mb` for PostgreSQL:** Docker's default 64 MB `/dev/shm` breaks parallel HNSW index builds.
+- **Sign `Content-Type` in presigned URLs.** AWS SDK v3 does not sign it by default, so S3 accepted any file type;
+  only real S3 revealed it (the emulators accepted everything). Fixed with `signableHeaders`.
+- **No NAT Gateway on AWS:** Lambdas reach S3 through a free gateway endpoint; a NAT Gateway alone would have cost
+  more than the whole budget.
 
 More in [docs/PLAN.md](docs/PLAN.md#decisions-and-findings).
 
@@ -111,21 +155,19 @@ More in [docs/PLAN.md](docs/PLAN.md#decisions-and-findings).
 | --- | --- |
 | `src/` | Rust crate root (`Cargo.toml`) |
 | `src/src/` | Rust service: `main.rs`, `repository.rs`, `recommendation_engine.rs`, `models.rs`, `error.rs` |
+| `src/lambda/` | Original Lambda skeleton, kept from the original structure (the Lambda is now built from `src/src/` with `lambda_http`) |
 | `src/api/` | Node.js API (Express) and its tests in `test/` |
-| `src/infra/` | Terraform for the S3 bucket |
-| `src/lambda/` | Original Lambda skeleton (phase 2) |
+| `src/infra/` | Terraform: `main.tf` for the local bucket, `aws/` for the AWS deployment |
 | `db/` | Schema, seed, and the `explain.sql` / `quality.sql` measurement scripts |
 | `loadtest/` | k6 load test |
-| `docs/` | [Plan](docs/PLAN.md), [results](docs/results.md), [original requirements](docs/original-requirements.md) |
+| `scripts/` | Lambda packaging, AWS terminal setup, CloudWatch metrics |
+| `docs/` | [Plan](docs/PLAN.md), [phase 2](docs/PHASE2.md), [results](docs/results.md), [original requirements](docs/original-requirements.md) |
 | `.devcontainer/` | Development environment |
 
-## Next steps (phase 2)
+## Next steps
 
-In progress: AWS deployment, see [docs/PHASE2.md](docs/PHASE2.md).
-
-
-1. Profile the load test to find whether Node, Rust or PostgreSQL saturates first.
-2. Real embeddings of title and description (for example `fastembed`, 384 dimensions).
-3. Rust and Node as Lambdas behind API Gateway, with full Terraform.
-4. AWS deployment (RDS PostgreSQL + RDS Proxy) and a 2,000 req/s load test from EC2.
-5. Vue 3 UI and per-creator engagement metrics.
+1. RDS Proxy and reserved concurrency for the Rust Lambda, then repeat the AWS load test past 200 req/s.
+2. Load test from an EC2 instance in the same region, to separate server latency from network latency.
+3. Real embeddings of title and description (for example `fastembed`, 384 dimensions).
+4. Vue 3 UI, usability tests and engagement metrics (impressions, clicks, CTR).
+5. Production hardening: private RDS subnet, Secrets Manager or IAM database auth, CI/CD.
