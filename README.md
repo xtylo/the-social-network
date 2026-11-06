@@ -23,10 +23,12 @@ Measured locally with 100,000 content items and 10,000 users ([details and how t
 | Tests | 4 Rust unit tests, 4 Node integration tests |
 | **AWS:** Rust Lambda warm duration / memory | **14-19 ms / 17 MB** (Node Lambda: 130 MB) |
 | **AWS:** healthy load from a laptop in Mexico | **100 req/s**, p50 102 ms (mostly network), 0 errors |
-| **AWS:** breaking point | 200 req/s: database connection storm (Lambda concurrency hit 400, RDS 206 connections, CPU only 54%) |
+| **AWS:** first breaking point | 200 req/s: database connection storm (Lambda concurrency hit 400, RDS 206 connections, 60% errors) |
+| **AWS:** after capping Lambda concurrency at 25 | 200 req/s with p50 105 ms, 1.1% errors (fast throttles); 300 req/s with 2.0% |
 
-On AWS, the limit was not the database CPU but **connections**: every new Lambda instance opens its own, which is
-what RDS Proxy solves (left out for cost). Full analysis in [docs/results.md](docs/results.md#aws-deployment-phase-2).
+On AWS, the limit was not the database CPU but **connections**: every new Lambda instance opens its own. Capping the
+Rust Lambda at 25 concurrent instances (one connection each) fixed it: errors at 200 req/s fell from 60% to 1.1%.
+RDS Proxy is the next step. Full analysis in [docs/results.md](docs/results.md#aws-deployment-phase-2).
 
 The quality number comes from synthetic data with perfectly separated categories: it shows the pipeline works end
 to end, not real-world quality. The load test shares one laptop between k6 and all services.
@@ -144,6 +146,8 @@ k6 run -e RATE=400 loadtest/k6.js                 # load test at a fixed rate
 - **`shm_size: 512mb` for PostgreSQL:** Docker's default 64 MB `/dev/shm` breaks parallel HNSW index builds.
 - **Sign `Content-Type` in presigned URLs.** AWS SDK v3 does not sign it by default, so S3 accepted any file type;
   only real S3 revealed it (the emulators accepted everything). Fixed with `signableHeaders`.
+- **Cap Lambda concurrency in front of a small database.** `reserved_concurrent_executions = 25` and one connection
+  per instance stopped the connection storm that took the system down at 200 req/s.
 - **No NAT Gateway on AWS:** Lambdas reach S3 through a free gateway endpoint; a NAT Gateway alone would have cost
   more than the whole budget.
 
@@ -166,7 +170,7 @@ More in [docs/PLAN.md](docs/PLAN.md#decisions-and-findings).
 
 ## Next steps
 
-1. RDS Proxy and reserved concurrency for the Rust Lambda, then repeat the AWS load test past 200 req/s.
+1. RDS Proxy (avoiding session pinning) and provisioned concurrency, then push the AWS load test past 300 req/s.
 2. Load test from an EC2 instance in the same region, to separate server latency from network latency.
 3. Real embeddings of title and description (for example `fastembed`, 384 dimensions).
 4. Vue 3 UI, usability tests and engagement metrics (impressions, clicks, CTR).

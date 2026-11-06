@@ -26,3 +26,9 @@ variable "allowed_origins" {
   type        = list(string)
   default     = ["http://localhost:5173"]
 }
+
+variable "reco_reserved_concurrency" {
+  description = "Max concurrent instances of the Rust Lambda. Caps database connections and prevents connection storms."
+  type        = number
+  default     = 25
+}

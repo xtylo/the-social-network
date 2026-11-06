@@ -121,9 +121,28 @@ Mexico, so every request includes the round trip to Virginia. Lambda and RDS num
   targets. On Lambda every instance is a separate process with its own pool, so connections grow with concurrency.
   This is the problem **RDS Proxy** solves (a shared pool in front of the database), which was left out for cost.
 
-**What would fix it, in order of impact:** RDS Proxy; reserved concurrency on the Rust Lambda (for example 20) so it
-fails fast instead of flooding the database; provisioned concurrency to avoid cold starts at traffic spikes; a larger
-RDS instance.
+### Fix: cap the Lambda's concurrency
+
+Change (`src/infra/aws/lambda.tf`): `reserved_concurrent_executions = 25` on the Rust Lambda and
+`DB_MAX_CONNECTIONS = 1` (an instance serves one request at a time). At most 25 instances can open connections,
+so the storm cannot start. Same test, same day, after a 10 req/s warm-up:
+
+| Step | | Achieved | p50 | p95 | p99 | Errors | Max concurrent Lambdas | Max RDS connections | Max RDS CPU |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 200 req/s | before | 149 req/s | 3.12 s | 6.25 s | 6.35 s | 60% | 400 | 206 | 54% |
+| 200 req/s | **after** | **199 req/s** | **105 ms** | **126 ms** | **171 ms** | **1.1%** | **25** | **27** | **20%** |
+| 300 req/s | before | 261 req/s | 211 ms | 3.17 s | 3.22 s | 50% | 400 | 206 | 54% |
+| 300 req/s | **after** | **297 req/s** | **105 ms** | **176 ms** | **403 ms** | **2.0%** | **25** | **27** | **20%** |
+
+- Lambda average duration stayed at 19-23 ms (2.2 s before) and Lambda **errors dropped to 0** (6,214 before).
+- The remaining 1-2% are **fast rejections**, not a collapse: 168 Lambda throttles when all 25 instances were busy
+  (mostly in the first minute, while instances warmed up), plus API Gateway's 300 req/s stage limit at peaks.
+- A single number turned a 60% failure rate into 1%: limiting concurrency protects a small database far better than
+  letting serverless scale without bounds.
+
+**Next improvements:** RDS Proxy (shared pool; needs Secrets Manager and avoiding session pinning from `SET` and
+sqlx's named prepared statements); a higher cap (for example 50) or provisioned concurrency to remove the throttles
+at ramp-up; a larger RDS instance.
 
 ## Environment notes
 

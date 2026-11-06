@@ -36,6 +36,10 @@ resource "aws_lambda_function" "reco" {
   memory_size      = 256
   timeout          = 10
 
+  # Cap on concurrent instances. Without it, a traffic spike made Lambda scale to 400 instances, each opening its own
+  # database connections, and RDS collapsed under the connection storm (see docs/results.md).
+  reserved_concurrent_executions = var.reco_reserved_concurrency
+
   vpc_config {
     subnet_ids         = local.lambda_vpc.subnet_ids
     security_group_ids = local.lambda_vpc.security_group_ids
@@ -43,8 +47,9 @@ resource "aws_lambda_function" "reco" {
 
   environment {
     variables = {
-      DATABASE_URL       = "${local.db_url}?sslmode=require"
-      DB_MAX_CONNECTIONS = "2"
+      DATABASE_URL = "${local.db_url}?sslmode=require"
+      # One instance serves one request at a time, so one connection is enough.
+      DB_MAX_CONNECTIONS = "1"
     }
   }
 

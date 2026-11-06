@@ -72,6 +72,8 @@ API Gateway and S3. Accounts created after July 15, 2025 get Free Tier credits t
 - **Load test: healthy up to 100 req/s, connection storm at 200 req/s.** Without RDS Proxy every new Lambda instance
   opens its own database connections; scale-out drove Lambda concurrency to the account limit (400) and RDS to 206
   connections while its CPU stayed at 54%. Details in [results.md](results.md#aws-deployment-phase-2).
+- **Fix verified the same day:** reserved concurrency of 25 on the Rust Lambda and one connection per instance.
+  At 200 req/s errors fell from 60% to 1.1% and p50 from 3.12 s to 105 ms; RDS stayed at 27 connections and 20% CPU.
 
 ## Day 9: Guardrails and Lambda-ready code (60 min)
 
