@@ -8,7 +8,7 @@ and a real **S3** bucket, all created with **Terraform** and destroyed at the en
 
 | Day | Topic | Status |
 | --- | --- | --- |
-| 9 | AWS account guardrails and Lambda-ready code | Pending |
+| 9 | AWS account guardrails and Lambda-ready code | Done |
 | 10 | Terraform: RDS + pgvector, S3, networking; load the data | Pending |
 | 11 | Terraform: Lambdas + API Gateway; end-to-end smoke test | Pending |
 | 12 | Load test on AWS, results, `terraform destroy` | Pending |
@@ -59,12 +59,12 @@ API Gateway and S3. Accounts created after July 15, 2025 get Free Tier credits t
 
 ## Day 9: Guardrails and Lambda-ready code (60 min)
 
-- [ ] (10 min) AWS Budgets: monthly cost budget of $5 with email alerts at 50% and 100%.
-- [ ] (5 min) Service Quotas -> AWS Lambda -> **Concurrent executions**: write down the value; request 1,000 if it is low.
-- [ ] (10 min) IAM user (or IAM Identity Center) with an access key; `aws configure --profile tsn`; check with `aws sts get-caller-identity --profile tsn`. Inside the dev container, `unset AWS_ENDPOINT_URL` for AWS sessions (it points to Floci).
-- [ ] (15 min) Rust: `lambda_http` runs the same axum router when `AWS_LAMBDA_RUNTIME_API` is set; TLS feature for sqlx; pool size from `DB_MAX_CONNECTIONS`. Build with `cargo lambda build --release --arm64 --output-format zip`.
-- [ ] (15 min) Node: `lambda.js` handler with `serverless-http`; pool size and SSL from environment variables; production-only zip.
-- [ ] (5 min) Both still run locally (`cargo run`, `npm start`, `npm test`).
+- [x] (10 min) AWS Budgets: monthly cost budget of $5 with email alerts at 50% and 100%.
+- [x] (5 min) Service Quotas -> AWS Lambda -> **Concurrent executions**: 400 on this account (increase to 1,000 requested).
+- [x] (10 min) IAM user (or IAM Identity Center) with an access key; `aws configure --profile tsn`; check with `aws sts get-caller-identity --profile tsn`. Inside the dev container, `unset AWS_ENDPOINT_URL` for AWS sessions (it points to Floci).
+- [x] (15 min) Rust: `lambda_http` runs the same axum router when `AWS_LAMBDA_RUNTIME_API` is set; TLS feature for sqlx; pool size from `DB_MAX_CONNECTIONS`. Build with `cargo lambda build --release --arm64 --output-format zip`.
+- [x] (15 min) Node: `lambda.js` handler with `serverless-http`; pool size and SSL from environment variables; production-only zip.
+- [x] (5 min) Both still run locally (`cargo run`, `npm start`, `npm test`).
 
 **Done when:** budget alert active, Lambda quota known, and both zip files built.
 
