@@ -9,7 +9,7 @@ and a real **S3** bucket, all created with **Terraform** and destroyed at the en
 | Day | Topic | Status |
 | --- | --- | --- |
 | 9 | AWS account guardrails and Lambda-ready code | Done |
-| 10 | Terraform: RDS + pgvector, S3, networking; load the data | Pending |
+| 10 | Terraform: RDS + pgvector, S3, networking; load the data | Done |
 | 11 | Terraform: Lambdas + API Gateway; end-to-end smoke test | Pending |
 | 12 | Load test on AWS, results, `terraform destroy` | Pending |
 
@@ -70,11 +70,11 @@ API Gateway and S3. Accounts created after July 15, 2025 get Free Tier credits t
 
 ## Day 10: Data and storage (60 min)
 
-- [ ] (15 min) `src/infra/aws/`: provider (`us-east-1`, profile `tsn`), default VPC and subnets, security groups (Lambda SG, RDS SG allowing 5432 from the Lambda SG and your IP).
-- [ ] (10 min) RDS PostgreSQL 17 `db.t4g.micro`, 20 GB gp3, single-AZ, no backups, `skip_final_snapshot`, random password.
-- [ ] (5 min) S3 bucket with a random suffix (bucket names are global), public access block, CORS; S3 gateway endpoint.
-- [ ] (15 min) `terraform apply` (RDS takes 5 to 10 minutes; read ahead while it runs).
-- [ ] (15 min) Load `db/01_schema.sql` and `db/02_seed.sql` with `psql` against the RDS endpoint; check counts and the HNSW index.
+- [x] (15 min) `src/infra/aws/`: provider (`us-east-1`, profile `tsn`), default VPC and subnets, security groups (Lambda SG, RDS SG allowing 5432 from the Lambda SG and your IP).
+- [x] (10 min) RDS PostgreSQL 17 `db.t4g.micro`, 20 GB gp3, single-AZ, no backups, `skip_final_snapshot`, random password.
+- [x] (5 min) S3 bucket with a random suffix (bucket names are global), public access block, CORS; S3 gateway endpoint.
+- [x] (15 min) `terraform apply` (RDS takes 5 to 10 minutes; read ahead while it runs).
+- [x] (15 min) Load `db/01_schema.sql` and `db/02_seed.sql` with `psql` against the RDS endpoint; check counts and the HNSW index.
 
 **Done when:** `psql` on RDS returns 100,000 content items and pgvector's version.
 

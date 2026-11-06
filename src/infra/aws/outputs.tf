@@ -13,3 +13,8 @@ output "bucket_name" {
   description = "S3 bucket for media files."
   value       = aws_s3_bucket.content.bucket
 }
+
+output "api_url" {
+  description = "Public API Gateway URL."
+  value       = aws_apigatewayv2_api.http.api_endpoint
+}
