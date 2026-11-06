@@ -24,3 +24,6 @@ loadtest/results/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Lambda build artifacts
+dist/

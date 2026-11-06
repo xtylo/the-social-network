@@ -121,6 +121,9 @@ More in [docs/PLAN.md](docs/PLAN.md#decisions-and-findings).
 
 ## Next steps (phase 2)
 
+In progress: AWS deployment, see [docs/PHASE2.md](docs/PHASE2.md).
+
+
 1. Profile the load test to find whether Node, Rust or PostgreSQL saturates first.
 2. Real embeddings of title and description (for example `fastembed`, 384 dimensions).
 3. Rust and Node as Lambdas behind API Gateway, with full Terraform.

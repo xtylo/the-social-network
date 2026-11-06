@@ -3,6 +3,6 @@ import pg from 'pg';
 
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 10, // max open connections
+  max: Number(process.env.DB_MAX_CONNECTIONS ?? 10),
   connectionTimeoutMillis: 3000, // fail fast if the database is down
 });

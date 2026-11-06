@@ -37,16 +37,24 @@ struct HealthResponse {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+async fn main() -> Result<(), lambda_http::Error> {
+    // AWS sets AWS_LAMBDA_RUNTIME_API inside Lambda; locally it does not exist.
+    let in_lambda = std::env::var("AWS_LAMBDA_RUNTIME_API").is_ok();
+
+    // CloudWatch shows raw text, so no terminal colors in Lambda.
+    tracing_subscriber::fmt().with_ansi(!in_lambda).init();
 
     // Configuration from environment variables (the dev container already sets DATABASE_URL).
     let database_url = std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?;
-    let port = std::env::var("RECO_PORT").unwrap_or_else(|_| "8080".to_string());
+    // Each Lambda instance handles one request at a time, so it needs very few connections.
+    let max_connections = std::env::var("DB_MAX_CONNECTIONS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
 
-    // Connection pool: opened once at startup and reused by every request.
+    // Connection pool: opened once at startup (or per Lambda instance) and reused by every request.
     let db = PgPoolOptions::new()
-        .max_connections(10)
+        .max_connections(max_connections)
         .acquire_timeout(Duration::from_secs(3))
         .connect(&database_url)
         .await?;
@@ -56,10 +64,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/recommendations/{user_id}", get(recommendations))
         .with_state(AppState { db });
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
-    tracing::info!("reco service listening on port {port}");
-    axum::serve(listener, app).await?;
-    Ok(())
+    if in_lambda {
+        // Same router, but requests come from API Gateway through the Lambda runtime.
+        lambda_http::run(app).await
+    } else {
+        let port = std::env::var("RECO_PORT").unwrap_or_else(|_| "8080".to_string());
+        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+        tracing::info!("reco service listening on port {port}");
+        axum::serve(listener, app).await?;
+        Ok(())
+    }
 }
 
 /// GET /health -> 200 with the pgvector version, or 503 if the database is unreachable.
