@@ -45,12 +45,44 @@ The recommender is 20x better than random on this data.
 
 The Node suite runs against the real database and needs the Rust service running (`cargo run`).
 
+## Load test (k6)
+
+`GET /recommendations/:userId` through the whole path: Node API -> Rust service -> PostgreSQL + pgvector (HNSW index).
+Random user per request. Each run sends a **fixed** number of requests per second for 30 s
+(`constant-arrival-rate`), so it measures one load level. Reproduce with `k6 run -e RATE=400 loadtest/k6.js`
+(Rust built with `--release`, Node with `LOG_LEVEL=warn`).
+
+Targets from the original requirements: p95 < 150 ms, p99 < 200 ms, errors < 0.1%.
+
+| Requested rate | Achieved | p50 | p95 | p99 | Max | Errors | Dropped | Targets met |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 100 req/s | 100 req/s | 5.6 ms | 7.5 ms | 9.6 ms | 15 ms | 0% | 0 | Yes |
+| 200 req/s | 200 req/s | 5.4 ms | 8.2 ms | 11.3 ms | 51 ms | 0% | 0 | Yes |
+| **400 req/s** | **400 req/s** | **5.9 ms** | **10.7 ms** | **19.3 ms** | 47 ms | **0%** | 0 | **Yes** |
+| 600 req/s | 600 req/s | 7.9 ms | 94.9 ms | 235.9 ms | 365 ms | 0% | 0 | No (p99) |
+| 800 req/s | 797 req/s | 17.7 ms | 111.4 ms | 280.7 ms | 408 ms | 0% | 0 | No (p99) |
+| 1,000 req/s | 615 req/s | 345 ms | 608 ms | 28.7 s | 30 s | 1.13% | 3,322 | No (all) |
+
+**Findings**
+
+- **Capacity within targets: 400 req/s**, with p99 of 19.3 ms (10x below the 200 ms target).
+- **Tail latency degrades first.** Between 400 and 600 req/s the median barely moves (5.9 -> 7.9 ms) but p99 jumps
+  from 19 ms to 236 ms: requests start to queue.
+- **Saturation point: about 800 req/s.** At 800 req/s every request is still served without errors, only slower.
+- **Collapse at 1,000 req/s.** Throughput *drops* to 615 req/s (below the 800 req/s run), latency reaches 30 s,
+  k6 cannot start 3,322 requests (`dropped_iterations`), and 1.13% fail with `dial: i/o timeout`
+  (new TCP connections are not accepted in time). This is congestion collapse: past saturation, more load means
+  less useful work.
+- **Not profiled yet:** which process (Node, Rust or PostgreSQL) saturates first. Next step: watch CPU per process
+  during the 600 and 800 req/s runs.
+
+**Caveat:** k6, Node, Rust and PostgreSQL run on the same laptop inside Docker Desktop, so they compete for CPU.
+These numbers compare load levels on this machine; they are not a production capacity estimate. The original target
+of 2,000 req/s belongs to the AWS deployment (phase 2).
+
 ## Environment notes
 
 - Docker limits `/dev/shm` to 64 MB. The first parallel HNSW build failed with
   `could not resize shared memory segment ... No space left on device`; the postgres service now sets
   `shm_size: 512mb` (larger than `maintenance_work_mem = 256MB`).
 
-## Pending
-
-- Load test with k6 (day 8): throughput, p95/p99 latency and error rate of `GET /recommendations/:userId`.

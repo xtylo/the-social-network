@@ -13,10 +13,10 @@ AWS deployment, Lambda, API Gateway and a UI are documented as phase 2.
 | 2 | Rust service skeleton (`/health`) | Done |
 | 3 | Recommendations endpoint | Done |
 | 4 | Re-ranking and Rust unit tests | Done |
-| 5 | Node API | Pending |
-| 6 | S3 presigned uploads + Terraform | Pending |
-| 7 | HNSW index, Node tests, recommendation quality | Pending |
-| 8 | k6 load test and final README | Pending |
+| 5 | Node API | Done |
+| 6 | S3 presigned uploads + Terraform | Done |
+| 7 | HNSW index, Node tests, recommendation quality | Done |
+| 8 | k6 load test and final README | Done |
 
 ## Scope
 
@@ -56,9 +56,11 @@ Recommendation logic (Rust):
 - **Dev container.** Merged compose file paths resolve from the repo root, so `.devcontainer/docker-compose.yml` uses `context: .devcontainer` and mounts `.`.
 - **`tflocal` and `awslocal` are deprecated.** Use plain `aws` (it honors `AWS_ENDPOINT_URL`) and plain `terraform` with the endpoint set in the provider.
 - **HNSW returns fewer rows than `LIMIT`.** With the index, `LIMIT 50` returned about 40 rows because `hnsw.ef_search` defaults to 40 and the "already seen" filter drops candidates. Fixed with `SET LOCAL hnsw.ef_search = 100` inside a transaction (`src/src/repository.rs`).
+- **Docker limits `/dev/shm` to 64 MB.** The parallel HNSW build failed with "No space left on device"; the postgres service sets `shm_size: 512mb` (larger than `maintenance_work_mem`).
+- **Load test results.** 400 req/s is the highest load that meets every target (p99 19 ms); saturation is about 800 req/s and the system collapses at 1,000 req/s. Details in [results.md](results.md).
 - **No made-up impact numbers.** The original requirements claim $300K/month and 2M interactions; the README only reports what is measured here.
 
-## Days 1 to 4 (done)
+## Days 1 to 4
 
 ### Day 1: Environment and data
 - [x] Repo structure, `docker-compose.yml` with `pgvector/pgvector:pg17` and Floci.
@@ -92,26 +94,26 @@ Recommendation logic (Rust):
 
 ## Day 6: S3 presigned uploads + Terraform (60 min)
 
-- [ ] (15 min) Fix `src/infra/main.tf`: remove the deprecated `acl` and the Lambda without an IAM role; keep `aws_s3_bucket`, `aws_s3_bucket_public_access_block` and `aws_s3_bucket_cors_configuration`. Point the provider to Floci (`endpoints { s3 = "http://floci:4566" }`, `s3_use_path_style = true`, skip credential validation). `terraform init && terraform apply`.
-- [ ] (25 min) `POST /uploads/presign` with `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`: returns `{ url, key }` (PUT, 10 min). S3 client with `endpoint: AWS_ENDPOINT_URL` and `forcePathStyle: true`. Keys: `creators/{creatorId}/{uuid}.{ext}`.
-- [ ] (10 min) `POST /content` registers `{ creatorId, title, category, key }` and builds the category vector.
-- [ ] (10 min) Try it: `curl -X PUT --upload-file video.mp4 "<url>"`, then `aws s3 ls s3://creator-content/creators/ --recursive`.
+- [x] (15 min) Fix `src/infra/main.tf`: remove the deprecated `acl` and the Lambda without an IAM role; keep `aws_s3_bucket`, `aws_s3_bucket_public_access_block` and `aws_s3_bucket_cors_configuration`. Point the provider to Floci (`endpoints { s3 = "http://floci:4566" }`, `s3_use_path_style = true`, skip credential validation). `terraform init && terraform apply`.
+- [x] (25 min) `POST /uploads/presign` with `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`: returns `{ url, key }` (PUT, 10 min). S3 client with `endpoint: AWS_ENDPOINT_URL` and `forcePathStyle: true`. Keys: `creators/{creatorId}/{uuid}.{ext}`.
+- [x] (10 min) `POST /content` registers `{ creatorId, title, category, key }` and builds the category vector.
+- [x] (10 min) Try it: `curl -X PUT --upload-file video.mp4 "<url>"`, then `aws s3 ls s3://creator-content/creators/ --recursive`.
 
 **Done when:** the file is in the bucket without going through the API, and the new content shows up in recommendations for users of that category.
 
 ## Day 7: HNSW index, tests and quality (60 min)
 
-- [ ] (15 min) `EXPLAIN ANALYZE` of the nearest-neighbor query without an index; then `CREATE INDEX content_embedding_hnsw ON content USING hnsw (embedding vector_cosine_ops);` and repeat. Write down both timings.
-- [ ] (25 min) Node tests with Mocha + Chai + `chai-http`: `GET /recommendations/:userId` returns 10 items; repeating `POST /interactions` does not duplicate rows.
-- [ ] (20 min) Offline quality in SQL: for 100 users, the share of recommendations in their preferred category versus random (1/16 = 6.25%).
+- [x] (15 min) `EXPLAIN ANALYZE` of the nearest-neighbor query without an index; then `CREATE INDEX content_embedding_hnsw ON content USING hnsw (embedding vector_cosine_ops);` and repeat. Write down both timings.
+- [x] (25 min) Node tests with Mocha + Chai + `chai-http`: `GET /recommendations/:userId` returns 10 items; repeating `POST /interactions` does not duplicate rows.
+- [x] (20 min) Offline quality in SQL: for 100 users, the share of recommendations in their preferred category versus random (1/16 = 6.25%).
 
 **Done when:** there are 3 numbers for the README: latency without the index, latency with the index, and hit rate versus 6.25%.
 
 ## Day 8: k6 load test and README (60 min)
 
-- [ ] (5 min) Run Rust with `cargo run --release` (debug numbers are not meaningful).
-- [ ] (25 min) Replace `loadtest/k6.js` (it targets LocalStack, not the API) with a `ramping-arrival-rate` scenario: 50 to 1,000 req/s over 3 minutes against `GET /recommendations/:userId`. Thresholds: `p(95)<150`, `p(99)<200`, `http_req_failed rate<0.001`. Record p95, p99, error rate and the req/s where thresholds break.
-- [ ] (30 min) README: problem, Mermaid diagram, how to run it (3 commands), decisions, measured results, next steps.
+- [x] (5 min) Run Rust with `cargo run --release` (debug numbers are not meaningful).
+- [x] (25 min) Replace `loadtest/k6.js` (it targeted LocalStack, not the API) with a `constant-arrival-rate` scenario against `GET /recommendations/:userId`, run in steps (`-e RATE=100` ... `1000`, 30 s each). Thresholds: `p(95)<150`, `p(99)<200`, `http_req_failed rate<0.001`. Fixed-rate steps replaced the planned single ramp: each run measures one load level, which makes the saturation point easy to read.
+- [x] (30 min) README: problem, Mermaid diagram, how to run it (3 commands), decisions, measured results, next steps.
 
 **Done when:** the README has a results table with real numbers and someone can run the project without asking.
 
