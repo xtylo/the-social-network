@@ -34,7 +34,12 @@ router.post('/uploads/presign', async (req, res) => {
   const key = `creators/${creatorId}/${randomUUID()}${extension}`;
 
   const command = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType });
-  const url = await getSignedUrl(s3, command, { expiresIn: URL_TTL_SECONDS });
+  // signableHeaders: SDK v3 does NOT sign Content-Type by default, so S3 would accept any file type.
+  // Signing it makes S3 reject (403) an upload whose Content-Type differs from the one requested here.
+  const url = await getSignedUrl(s3, command, {
+    expiresIn: URL_TTL_SECONDS,
+    signableHeaders: new Set(['content-type']),
+  });
 
   res.status(201).json({ url, key, expiresIn: URL_TTL_SECONDS });
 });

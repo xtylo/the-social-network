@@ -10,7 +10,7 @@ and a real **S3** bucket, all created with **Terraform** and destroyed at the en
 | --- | --- | --- |
 | 9 | AWS account guardrails and Lambda-ready code | Done |
 | 10 | Terraform: RDS + pgvector, S3, networking; load the data | Done |
-| 11 | Terraform: Lambdas + API Gateway; end-to-end smoke test | Pending |
+| 11 | Terraform: Lambdas + API Gateway; end-to-end smoke test | Done |
 | 12 | Load test on AWS, results, `terraform destroy` | Pending |
 
 ## Architecture on AWS
@@ -57,6 +57,19 @@ API Gateway and S3. Accounts created after July 15, 2025 get Free Tier credits t
 - **No RDS Proxy.** Each Lambda instance opens at most 2 connections; `db.t4g.micro` allows about 80, which caps
   concurrency. This is expected to be the bottleneck of the load test, and measuring it is part of the point.
 
+## Findings
+
+- **Presigned URLs did not enforce the file type.** AWS SDK v3 does not sign `Content-Type` by default, so S3 accepted
+  an `image/png` upload on a URL requested for `video/mp4`. Fixed with `signableHeaders: new Set(['content-type'])`;
+  S3 now returns 403 on a mismatch. Only real S3 revealed it: the emulators accepted any type.
+- **Smoke test timings (from the laptop in Mexico to `us-east-1`, one `curl` each):** Node cold start 2.08 s,
+  Rust cold start 0.93 s, Rust warm 0.29 s (mostly network and TLS handshake; the Lambda itself ran in 18.7 ms).
+- **Memory:** the Rust Lambda used 17 MB; the Node Lambda used 130 MB. Lambda bills memory x time, so the hot path
+  (recommendations) is also the cheapest one.
+- **RDS seed is slow with the HNSW index already in place:** the index is updated row by row on a 2 vCPU / 1 GB
+  instance. For bulk loads, create the index after inserting the data.
+- **Query on RDS:** the nearest-neighbor query ran in 4.7 ms on `db.t4g.micro` (3.9 ms on the laptop).
+
 ## Day 9: Guardrails and Lambda-ready code (60 min)
 
 - [x] (10 min) AWS Budgets: monthly cost budget of $5 with email alerts at 50% and 100%.
@@ -80,10 +93,10 @@ API Gateway and S3. Accounts created after July 15, 2025 get Free Tier credits t
 
 ## Day 11: Compute and API (60 min)
 
-- [ ] (15 min) IAM roles: basic execution + VPC access for both Lambdas; `s3:PutObject` and `s3:GetObject` on the bucket for Node.
-- [ ] (15 min) Two Lambdas (arm64, in the default VPC with the Lambda SG) from the day 9 zip files; environment variables for the database, bucket and pool size.
-- [ ] (10 min) API Gateway HTTP API: `GET /recommendations/{userId}` -> Rust, `$default` -> Node; Lambda permissions; output the URL.
-- [ ] (20 min) Smoke test against the API URL: health, recommendations for user 42, idempotent like, presigned upload to the real bucket, content registration.
+- [x] (15 min) IAM roles: basic execution + VPC access for both Lambdas; `s3:PutObject` and `s3:GetObject` on the bucket for Node.
+- [x] (15 min) Two Lambdas (arm64, in the default VPC with the Lambda SG) from the day 9 zip files; environment variables for the database, bucket and pool size.
+- [x] (10 min) API Gateway HTTP API: `GET /recommendations/{userId}` -> Rust, `$default` -> Node; Lambda permissions; output the URL.
+- [x] (20 min) Smoke test against the API URL: health, recommendations for user 42, idempotent like, presigned upload to the real bucket, content registration.
 
 **Done when:** the full flow of days 3 to 6 works against the API Gateway URL.
 
