@@ -26,6 +26,7 @@ Measured locally with 100,000 content items and 10,000 users ([details and how t
 | **AWS:** healthy load from a laptop in Mexico | **100 req/s**, p50 102 ms (mostly network), 0 errors |
 | **AWS:** first breaking point | 200 req/s: database connection storm (Lambda concurrency hit 400, RDS 206 connections, 60% errors) |
 | **AWS:** after capping Lambda concurrency at 25 | 200 req/s with p50 105 ms, 1.1% errors (fast throttles); 300 req/s with 2.0% |
+| **AWS:** ceiling with a 60-instance cap (2,000 req/s target) | ~580 successful req/s; at 1,000 req/s 41.6% throttled, 0 Lambda errors; target not reached |
 
 On AWS, the limit was not the database CPU but **connections**: every new Lambda instance opens its own. Capping the
 Rust Lambda at 25 concurrent instances (one connection each) fixed it: errors at 200 req/s fell from 60% to 1.1%.
@@ -170,14 +171,15 @@ More in [docs/PLAN.md](docs/PLAN.md#decisions-and-findings).
 | `db/` | Schema, seed, and the `explain.sql` / `quality.sql` measurement scripts |
 | `loadtest/` | k6 load test |
 | `scripts/` | Lambda packaging, AWS terminal setup, CloudWatch metrics |
-| `docs/` | [Plan](docs/PLAN.md), [phase 2](docs/PHASE2.md), [results](docs/results.md), [original requirements](docs/original-requirements.md) |
+| `docs/` | [Plan](docs/PLAN.md), [phase 2](docs/PHASE2.md), [phase 3](docs/PHASE3.md), [results](docs/results.md), [original requirements](docs/original-requirements.md) |
 | `.devcontainer/` | Development environment |
 
 ## Next steps
 
-In progress: engagement measurement and 2,000 req/s on AWS, see [docs/PHASE3.md](docs/PHASE3.md).
+Phase 3 (engagement A/B test and the push toward 2,000 req/s) is documented in [docs/PHASE3.md](docs/PHASE3.md).
 
-1. RDS Proxy (avoiding session pinning) and provisioned concurrency, then push the AWS load test past 300 req/s.
+1. Reach 2,000 req/s: a 4+ vCPU database (requires leaving the AWS Free plan), RDS Proxy (avoiding session pinning)
+   to raise the Lambda cap safely, and a load generator inside AWS.
 2. Load test from an EC2 instance in the same region, to separate server latency from network latency.
 3. Real embeddings of title and description (for example `fastembed`, 384 dimensions).
 4. Vue 3 UI, usability tests and engagement metrics (impressions, clicks, CTR).

@@ -164,6 +164,35 @@ recommender uses, so the recommended feed is expected to win. What this validate
 (stable A/B assignment, impression logging, click attribution, CTR per variant and per position). With real users,
 the same pipeline produces the real impact number that the original requirements only claimed.
 
+## Toward 2,000 req/s (phase 3)
+
+Redeployed on AWS with the Rust Lambda capped at **60** concurrent instances (25 in phase 2), API Gateway limits
+raised to 3,000 req/s, and the same `db.t4g.micro` database (the AWS Free plan rejected `db.t4g.xlarge`).
+Gradual warm-up (100 and 300 req/s), then 30 s steps from the laptop.
+
+| Requested | Achieved | Successful | p50 | p95 | p99 | Failed (throttled) | Lambda avg duration | Max concurrent Lambdas | Max RDS connections | Max RDS CPU |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 500 req/s | 497 req/s | ~483 req/s | 117 ms | 193 ms | 294 ms | 3.4% | 31 ms | 60 | 60 | 41% |
+| 1,000 req/s | 983 req/s | ~577 req/s | 148 ms | 232 ms | 381 ms | 41.6% | 81 ms | 60 (cap) | 62 | 50% |
+
+1,500 and 2,000 req/s were skipped: with 41.6% throttled at 1,000 req/s, the ceiling was already clear.
+
+**Findings**
+
+- **Ceiling: about 580 successful req/s on this database**, up from under 300 in phase 2. The 2,000 req/s target
+  of the original requirements was not reached.
+- **Little's law explains the throttling.** Instances needed = requests per second x duration. At 1,000 req/s the
+  Lambda's average duration rose from 31 ms to 81 ms, so it needed about 81 instances; with a cap of 60, Lambda
+  rejected the rest immediately.
+- **It failed fast, not in a storm.** p99 stayed at 381 ms, Lambda errors were 0 and RDS stayed at 62 connections.
+  The cap protected the database exactly as intended.
+- **Open question:** queries slowed down while RDS CPU peaked at only 50%. Possible causes are memory pressure on a
+  1 GB instance or burstable CPU credits; it was not profiled.
+
+**What 2,000 req/s would need:** a larger database (4+ vCPU, which requires leaving the Free plan) so queries stay
+near 30 ms under load, plus a higher concurrency cap with RDS Proxy so connections do not grow with it, and a load
+generator inside AWS.
+
 ## Environment notes
 
 - Docker limits `/dev/shm` to 64 MB. The first parallel HNSW build failed with

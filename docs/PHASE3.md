@@ -16,13 +16,19 @@ Out of scope (documented as next steps): real embeddings, Prometheus/Grafana, UI
 | --- | --- | --- |
 | 13 | Engagement: impressions, A/B feed, CTR, simulated users (local) | Done |
 | 14 | Redeploy on AWS sized for 2,000 req/s | Done |
-| 15 | Ramp to 2,000 req/s, results, `terraform destroy` | Pending |
+| 15 | Ramp to 2,000 req/s, results, `terraform destroy` | Done |
 
 ## Findings
 
-- **AWS Free plan limits RDS sizes.** `db.t4g.xlarge` failed with `FreeTierRestrictionError`; `db.t4g.small`
-  (2 vCPU, 2 GB) was accepted. The micro, small and medium classes all have 2 vCPU, so the 2,000 req/s test runs on
-  the same CPU as phase 2, with more memory for connections.
+- **AWS Free plan limits RDS sizes.** `db.t4g.xlarge` failed with `FreeTierRestrictionError`. The test ran on
+  `db.t4g.micro` (the same 2 vCPU, 1 GB instance as phase 2) with the Rust Lambda capped at 60 instances
+  (`db.t4g.small` was planned but, by mistake, not the one deployed).
+- **Ceiling on this database: about 580 successful req/s.** At 500 req/s, 3.4% of requests were throttled. At
+  1,000 req/s the Lambda's average duration rose from 31 ms to 81 ms; by Little's law (instances = req/s x duration)
+  that needs about 81 instances, above the cap of 60, so Lambda throttled 41.6% of requests. It failed fast (p99
+  381 ms, 0 Lambda errors) instead of collapsing as in phase 2. Steps of 1,500 and 2,000 req/s were skipped.
+- **Not explained yet:** why queries slowed down while RDS CPU peaked at only 50% (possible causes: memory pressure on
+  1 GB or burstable CPU credits). Not profiled.
 - **Load data first, index second.** On RDS the seed took 2.1 s for 100,000 content items and 6.0 s for 200,000 likes,
   and the HNSW index was built afterwards in 36.4 s (about 45 s in total). In phase 2, with the index created before
   the seed, loading took several minutes because the graph was updated row by row.
@@ -60,8 +66,8 @@ metrics), which would produce real numbers with real users.
 
 | Setting | Phase 2 | Phase 3 | Why |
 | --- | --- | --- | --- |
-| RDS instance | `db.t4g.micro` (2 vCPU, 1 GB) | `db.t4g.small` (2 vCPU, 2 GB) | 4 vCPU was planned, but the AWS Free plan rejects larger classes (`FreeTierRestrictionError`); 2 GB allows ~180 connections for 100 Lambdas |
-| Rust Lambda reserved concurrency | 25 | 100 | 2,000 req/s x ~20 ms is about 40 concurrent instances |
+| RDS instance | `db.t4g.micro` (2 vCPU, 1 GB) | `db.t4g.micro` (unchanged) | 4 vCPU was planned, but the AWS Free plan rejects larger classes (`FreeTierRestrictionError`) |
+| Rust Lambda reserved concurrency | 25 | 60 | 100 was planned; 60 fits the ~80 connections of `db.t4g.micro` |
 | API Gateway stage limit | 300 req/s | 3,000 req/s | Stay above the target |
 | Seed | Index created before loading | Index created after loading | Building HNSW once is much faster than row by row |
 
@@ -76,11 +82,11 @@ metrics), which would produce real numbers with real users.
 
 ## Day 15: Ramp to 2,000 req/s and teardown (60 min)
 
-- [ ] (25 min) k6 from the laptop: warm up, then 500, 1,000, 1,500 and 2,000 req/s (30 s each). Watch throttles,
+- [x] (25 min) k6 from the laptop: warm up, then 500 and 1,000 req/s (30 s each; 1,500 and 2,000 skipped after 41.6% throttling at 1,000). Watch throttles,
   concurrency, RDS CPU and connections with `scripts/aws-metrics.sh`.
-- [ ] (15 min) Results in `docs/results.md` and the README.
-- [ ] (15 min) **`terraform destroy`**, check that nothing is left, delete the access key.
-- [ ] (5 min) Commit.
+- [x] (15 min) Results in `docs/results.md` and the README.
+- [x] (15 min) **`terraform destroy`**, check that nothing is left, delete the access key.
+- [x] (5 min) Commit.
 
 **Done when:** the 2,000 req/s result is documented (met or not, with the reason) and nothing is left running.
 

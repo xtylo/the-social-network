@@ -16,11 +16,11 @@ variable "my_ip_cidr" {
 }
 
 variable "db_instance_class" {
-  # Phase 2: db.t4g.micro (2 vCPU, 1 GB, ~80 max connections). Phase 3: db.t4g.small (2 vCPU, 2 GB) so 100 Lambda
-  # connections fit. Larger classes (e.g. db.t4g.xlarge) are rejected on AWS Free plan accounts.
+  # Phases 2 and 3 were measured on db.t4g.micro (2 vCPU, 1 GB, ~80 max connections).
+  # Larger classes (e.g. db.t4g.xlarge) are rejected on AWS Free plan accounts; db.t4g.small was not tested.
   description = "RDS instance class."
   type        = string
-  default     = "db.t4g.small"
+  default     = "db.t4g.micro"
 }
 
 variable "allowed_origins" {
@@ -32,7 +32,7 @@ variable "allowed_origins" {
 variable "reco_reserved_concurrency" {
   description = "Max concurrent instances of the Rust Lambda. Caps database connections and prevents connection storms."
   type        = number
-  default     = 100 # phase 2 used 25; 2,000 req/s x ~20 ms is about 40 concurrent instances
+  default     = 60 # phase 2: 25; phase 3: 60 (fits the ~80 connections of db.t4g.micro)
 }
 
 variable "api_rate_limit" {
