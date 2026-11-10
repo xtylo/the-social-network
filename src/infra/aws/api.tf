@@ -12,10 +12,10 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
-  # Guardrail for the budget: API Gateway rejects traffic above this with 429.
+  # Guardrail: API Gateway rejects traffic above this with 429.
   default_route_settings {
-    throttling_rate_limit  = 300
-    throttling_burst_limit = 500
+    throttling_rate_limit  = var.api_rate_limit
+    throttling_burst_limit = var.api_burst_limit
   }
 }
 
