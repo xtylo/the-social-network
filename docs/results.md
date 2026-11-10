@@ -144,6 +144,26 @@ so the storm cannot start. Same test, same day, after a 10 req/s warm-up:
 sqlx's named prepared statements); a higher cap (for example 50) or provisioned concurrency to remove the throttles
 at ramp-up; a larger RDS instance.
 
+## Engagement A/B test (phase 3)
+
+Every item the feed shows is logged in `feed_impressions`; a click is a `view` interaction after the impression.
+Users are split by a hash of their id: half get the **recommended** feed (Rust service), half the **chronological**
+feed (newest unseen content). 1,000 simulated users, one feed each, local environment.
+Reproduce with `node scripts/simulate-engagement.mjs 1000` and `psql "$DATABASE_URL" -f db/engagement.sql`.
+
+| Variant | Users | Impressions | Clicks | CTR | Like rate |
+| --- | --- | --- | --- | --- | --- |
+| Chronological | 464 | 4,650 | 171 | 3.68% | 0.86% |
+| Recommended | 536 | 5,370 | 1,273 | **23.71%** | **9.78%** |
+
+**CTR lift of the recommended feed: +544.6%.** CTR also falls with position (recommended: 31.1% at the top,
+13.2% at position 10), the usual position bias of feeds.
+
+**Caveat:** the simulated users click more on their preferred category (30% vs 3%), which is the same signal the
+recommender uses, so the recommended feed is expected to win. What this validates is the **measurement pipeline**
+(stable A/B assignment, impression logging, click attribution, CTR per variant and per position). With real users,
+the same pipeline produces the real impact number that the original requirements only claimed.
+
 ## Environment notes
 
 - Docker limits `/dev/shm` to 64 MB. The first parallel HNSW build failed with

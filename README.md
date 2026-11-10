@@ -21,6 +21,7 @@ Measured locally with 100,000 content items and 10,000 users ([details and how t
 | Saturation point | ~800 req/s (p99 281 ms, no errors) |
 | Collapse | 1,000 req/s (throughput falls to 615 req/s, 1.13% errors) |
 | Tests | 4 Rust unit tests, 4 Node integration tests |
+| A/B test, recommended vs chronological feed (1,000 simulated users) | CTR **23.71% vs 3.68%** (+545%); see caveat below |
 | **AWS:** Rust Lambda warm duration / memory | **14-19 ms / 17 MB** (Node Lambda: 130 MB) |
 | **AWS:** healthy load from a laptop in Mexico | **100 req/s**, p50 102 ms (mostly network), 0 errors |
 | **AWS:** first breaking point | 200 req/s: database connection storm (Lambda concurrency hit 400, RDS 206 connections, 60% errors) |
@@ -29,6 +30,9 @@ Measured locally with 100,000 content items and 10,000 users ([details and how t
 On AWS, the limit was not the database CPU but **connections**: every new Lambda instance opens its own. Capping the
 Rust Lambda at 25 concurrent instances (one connection each) fixed it: errors at 200 req/s fell from 60% to 1.1%.
 RDS Proxy is the next step. Full analysis in [docs/results.md](docs/results.md#aws-deployment-phase-2).
+
+The A/B test measures engagement with logged impressions and clicks; its users are simulated and click on the same
+signal the recommender uses, so the result validates the measurement pipeline rather than real-world impact.
 
 The quality number comes from synthetic data with perfectly separated categories: it shows the pipeline works end
 to end, not real-world quality. The load test shares one laptop between k6 and all services.
@@ -78,6 +82,7 @@ without a NAT Gateway (a free S3 gateway endpoint gives them S3), and every IAM 
 | --- | --- | --- |
 | `GET` | `/health` | Database check |
 | `GET` | `/recommendations/:userId` | 10 recommendations (`personalized` or `trending`), proxied to Rust |
+| `GET` | `/feed/:userId` | A/B feed: recommended or chronological (stable per user); logs impressions |
 | `POST` | `/interactions` | `{ userId, contentId, type: view \| like \| share }`, idempotent |
 | `GET` | `/content/:id` | One content item |
 | `POST` | `/uploads/presign` | `{ creatorId, filename, contentType }` -> `{ url, key, expiresIn }` |
@@ -169,6 +174,8 @@ More in [docs/PLAN.md](docs/PLAN.md#decisions-and-findings).
 | `.devcontainer/` | Development environment |
 
 ## Next steps
+
+In progress: engagement measurement and 2,000 req/s on AWS, see [docs/PHASE3.md](docs/PHASE3.md).
 
 1. RDS Proxy (avoiding session pinning) and provisioned concurrency, then push the AWS load test past 300 req/s.
 2. Load test from an EC2 instance in the same region, to separate server latency from network latency.

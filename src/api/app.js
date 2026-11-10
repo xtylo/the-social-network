@@ -5,6 +5,7 @@ import { pinoHttp } from 'pino-http';
 import { pool } from './db.js';
 import { logger } from './logger.js';
 import contentRoutes from './routes/content.js';
+import feedRoutes from './routes/feed.js';
 import interactionRoutes from './routes/interactions.js';
 import uploadRoutes from './routes/uploads.js';
 
@@ -25,6 +26,7 @@ app.get('/health', async (req, res) => {
 });
 
 app.use(contentRoutes);
+app.use(feedRoutes);
 app.use(interactionRoutes);
 app.use(uploadRoutes);
 
